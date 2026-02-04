@@ -329,7 +329,7 @@ governing equations, and comprehensive solution comparison.
 """)
 
 # Create main tabs
-main_tabs = st.tabs(["📋 Problem Setup", "🔬 Solution Methods", "📊 Results Analysis", "📚 Theory"])
+main_tabs = st.tabs(["📋 Problem Setup", "🔬 Solution Methods", "📊 Results Analysis", "� Method Comparison", "� Theory"])
 
 with main_tabs[0]:
     st.header("📋 Problem Setup & Parameters")
@@ -648,6 +648,241 @@ with main_tabs[2]:
         st.info("🔄 Please run at least one method to see results analysis")
 
 with main_tabs[3]:
+    st.header("🔄 Comprehensive Method Comparison")
+    
+    st.markdown("""
+    This section provides detailed comparison between different numerical methods for solving 
+    Rayleigh-Bénard convection. Compare accuracy, performance, and physical consistency.
+    """)
+    
+    # Check if we have results to compare
+    if st.session_state.results1 is not None and st.session_state.results2 is not None:
+        st.success("✅ Both methods completed! Ready for comprehensive comparison.")
+        
+        # Method selection for comparison
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown(f"**Method 1:** {method1.replace('_', ' ').title()}")
+            if st.session_state.time1:
+                st.write(f"⏱️ Computation time: {st.session_state.time1:.2f}s")
+            if st.session_state.results1:
+                st.write(f"🔄 Iterations: {st.session_state.results1.get('iterations', 'N/A')}")
+                st.write(f"📊 Final error: {st.session_state.results1.get('final_error', 0):.2e}")
+        
+        with col2:
+            st.markdown(f"**Method 2:** {method2.replace('_', ' ').title()}")
+            if st.session_state.time2:
+                st.write(f"⏱️ Computation time: {st.session_state.time2:.2f}s")
+            if st.session_state.results2:
+                st.write(f"🔄 Iterations: {st.session_state.results2.get('iterations', 'N/A')}")
+                st.write(f"📊 Final error: {st.session_state.results2.get('final_error', 0):.2e}")
+        
+        # Comprehensive comparison plots
+        st.markdown("---")
+        st.subheader("🔬 Side-by-Side Solution Comparison")
+        
+        comparison_fig = create_solution_comparison(
+            st.session_state.results1, st.session_state.results2, 
+            method1, method2
+        )
+        if comparison_fig:
+            st.plotly_chart(comparison_fig, use_container_width=True)
+        
+        # Detailed error analysis
+        st.markdown("---")
+        st.subheader("📊 Quantitative Error Analysis")
+        
+        # Calculate and display errors
+        error_metrics = {}
+        for field_name, field_key in [
+            ('Temperature', 'temperature'),
+            ('U Velocity', 'u_velocity'),
+            ('V Velocity', 'v_velocity'),
+            ('Stream Function', 'stream_function')
+        ]:
+            if field_key in st.session_state.results1 and field_key in st.session_state.results2:
+                field1 = st.session_state.results1[field_key]
+                field2 = st.session_state.results2[field_key]
+                
+                if not (np.any(np.isnan(field1)) or np.any(np.isnan(field2))):
+                    l2_error = np.sqrt(np.mean((field1 - field2)**2))
+                    rel_error = l2_error / (np.sqrt(np.mean(field1**2)) + 1e-10)
+                    max_error = np.max(np.abs(field1 - field2))
+                    
+                    error_metrics[field_name] = {
+                        'L2 Error': l2_error,
+                        'Relative Error': rel_error,
+                        'Max Error': max_error
+                    }
+        
+        if error_metrics:
+            # Create error comparison chart
+            fig = go.Figure()
+            
+            fields = list(error_metrics.keys())
+            l2_errors = [error_metrics[f]['L2 Error'] for f in fields]
+            rel_errors = [error_metrics[f]['Relative Error'] for f in fields]
+            max_errors = [error_metrics[f]['Max Error'] for f in fields]
+            
+            fig.add_trace(go.Bar(name='L2 Error', x=fields, y=l2_errors))
+            fig.add_trace(go.Bar(name='Relative Error', x=fields, y=rel_errors))
+            fig.add_trace(go.Bar(name='Max Error', x=fields, y=max_errors))
+            
+            fig.update_layout(
+                title='Error Metrics Comparison Between Methods',
+                xaxis_title='Field',
+                yaxis_title='Error Magnitude',
+                barmode='group'
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Detailed error table
+            st.subheader("📋 Detailed Error Metrics")
+            for field_name, metrics in error_metrics.items():
+                with st.expander(f"{field_name} Error Details"):
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("L2 Error", f"{metrics['L2 Error']:.4e}")
+                    with col2:
+                        st.metric("Relative Error", f"{metrics['Relative Error']:.4e}")
+                    with col3:
+                        st.metric("Max Error", f"{metrics['Max Error']:.4e}")
+        
+        # Physical comparison
+        st.markdown("---")
+        st.subheader("🌊 Physical Quantities Comparison")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("**Heat Transfer Analysis**")
+            if 'temperature' in st.session_state.results1:
+                Nu1 = compute_nusselt_number(
+                    st.session_state.results1['temperature'],
+                    st.session_state.results1['y']
+                )
+                st.metric(f"{method1} Nusselt Number", f"{Nu1:.3f}")
+                
+                if Nu1 > 1.0:
+                    st.success(f"✅ Convective heat transfer enhancement: {((Nu1-1)*100):.1f}%")
+                else:
+                    st.info("ℹ️ Conduction-dominated heat transfer")
+            
+            if 'temperature' in st.session_state.results2:
+                Nu2 = compute_nusselt_number(
+                    st.session_state.results2['temperature'],
+                    st.session_state.results2['y']
+                )
+                st.metric(f"{method2} Nusselt Number", f"{Nu2:.3f}")
+                
+                if Nu2 > 1.0:
+                    st.success(f"✅ Convective heat transfer enhancement: {((Nu2-1)*100):.1f}%")
+        
+        with col2:
+            st.markdown("**Flow Characteristics**")
+            if 'u_velocity' in st.session_state.results1:
+                u1 = st.session_state.results1['u_velocity']
+                v1 = st.session_state.results1['v_velocity']
+                speed1 = np.sqrt(u1**2 + v1**2)
+                st.metric(f"{method1} Max Velocity", f"{np.max(speed1):.3f}")
+                st.metric(f"{method1} Mean Velocity", f"{np.mean(speed1):.3f}")
+            
+            if 'u_velocity' in st.session_state.results2:
+                u2 = st.session_state.results2['u_velocity']
+                v2 = st.session_state.results2['v_velocity']
+                speed2 = np.sqrt(u2**2 + v2**2)
+                st.metric(f"{method2} Max Velocity", f"{np.max(speed2):.3f}")
+                st.metric(f"{method2} Mean Velocity", f"{np.mean(speed2):.3f}")
+        
+        # Performance comparison
+        st.markdown("---")
+        st.subheader("⚡ Performance Comparison")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric(f"{method1} Time", f"{st.session_state.time1:.2f}s")
+        with col2:
+            st.metric(f"{method2} Time", f"{st.session_state.time2:.2f}s")
+        with col3:
+            if st.session_state.time1 > 0 and st.session_state.time2 > 0:
+                speedup = st.session_state.time2 / st.session_state.time1
+                faster_method = method1 if speedup > 1 else method2
+                st.metric("Speedup", f"{abs(speedup):.2f}x", delta=f"{faster_method} faster")
+        with col4:
+            st.metric("Grid Resolution", f"{st.session_state.nx}×{st.session_state.ny}")
+        
+        # Method recommendations
+        st.markdown("---")
+        st.subheader("💡 Method Recommendations")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown(f"**{method1.replace('_', ' ').title()}**")
+            if method1 == 'finite_difference':
+                st.info("✅ **Best for:**\n- General purpose problems\n- Complex geometries\n- Robustness is critical")
+            elif method1 == 'spectral':
+                st.info("✅ **Best for:**\n- High accuracy requirements\n- Smooth solutions\n- Research applications")
+            elif method1 == 'pinn_huggingface':
+                st.info("✅ **Best for:**\n- Transfer learning\n- Parameter studies\n- Mesh-free solutions")
+        
+        with col2:
+            st.markdown(f"**{method2.replace('_', ' ').title()}**")
+            if method2 == 'finite_difference':
+                st.info("✅ **Best for:**\n- General purpose problems\n- Complex geometries\n- Robustness is critical")
+            elif method2 == 'spectral':
+                st.info("✅ **Best for:**\n- High accuracy requirements\n- Smooth solutions\n- Research applications")
+            elif method2 == 'pinn_huggingface':
+                st.info("✅ **Best for:**\n- Transfer learning\n- Parameter studies\n- Mesh-free solutions")
+        
+    elif st.session_state.results1 is not None or st.session_state.results2 is not None:
+        available_method = method1 if st.session_state.results1 is not None else method2
+        st.info(f"🔄 Only {available_method.replace('_', ' ').title()} has been run. Run another method to enable comparison.")
+        
+        # Show available results
+        if st.session_state.results1 is not None:
+            st.subheader(f"📊 {method1.replace('_', ' ').title()} Results")
+            st.write("Run a second method to see detailed comparison.")
+        
+        if st.session_state.results2 is not None:
+            st.subheader(f"📊 {method2.replace('_', ' ').title()} Results")
+            st.write("Run a second method to see detailed comparison.")
+    
+    else:
+        st.warning("🔄 No methods have been run yet. Go to **Solution Methods** tab to run solvers and enable comparison.")
+        
+        # Show method comparison guide
+        st.markdown("---")
+        st.subheader("📖 How to Compare Methods")
+        
+        st.markdown("""
+        **Step 1:** Go to **🔬 Solution Methods** tab
+        
+        **Step 2:** Select two different methods to compare:
+        - **Finite Difference** - Traditional CFD approach
+        - **Spectral Method** - High accuracy Fourier method  
+        - **PINN** - Machine learning approach
+        
+        **Step 3:** Run both methods (individually or use "Compare Both")
+        
+        **Step 4:** Return to this **🔄 Method Comparison** tab for detailed analysis
+        """)
+        
+        # Show available methods
+        methods = SolverFactory.get_available_methods()
+        st.markdown("**Available Methods:**")
+        for method_key, method_info in methods.items():
+            with st.expander(f"🔬 {method_info['name']}"):
+                st.write(f"**Description:** {method_info['description']}")
+                st.write("**Advantages:**")
+                for pro in method_info['pros']:
+                    st.write(f"✅ {pro}")
+                st.write("**Limitations:**")
+                for con in method_info['cons']:
+                    st.write(f"❌ {con}")
+
+with main_tabs[4]:
     st.header("📚 Theory & Background")
     
     # Comprehensive theory section
