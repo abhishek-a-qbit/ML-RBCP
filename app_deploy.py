@@ -7,10 +7,7 @@ import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import time
-import sys
-import os
 
 # Set page config
 st.set_page_config(
