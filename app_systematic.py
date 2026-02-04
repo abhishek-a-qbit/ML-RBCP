@@ -35,6 +35,18 @@ except ImportError as e:
                     'description': 'Traditional CFD approach using grid discretization',
                     'pros': ['Robust', 'Widely applicable', 'Easy to implement'],
                     'cons': ['Second-order accuracy', 'Numerical diffusion']
+                },
+                'spectral': {
+                    'name': 'Spectral Method',
+                    'description': 'High accuracy using Fourier series',
+                    'pros': ['Exponential convergence', 'Minimal numerical diffusion'],
+                    'cons': ['Requires periodic boundaries', 'Complex implementation']
+                },
+                'pinn_huggingface': {
+                    'name': 'Physics-Informed Neural Network',
+                    'description': 'ML approach with physics constraints',
+                    'pros': ['Mesh-free', 'Transfer learning', 'Handles complex BCs'],
+                    'cons': ['Training time', 'Hyperparameter sensitivity']
                 }
             }
         
@@ -340,7 +352,9 @@ def create_parameter_sensitivity_plot():
     
     # Rayleigh number effect
     Ra_range = np.logspace(3, 6, 50)
-    Nu_critical = 1 + 0.5 * ((Ra_range/1708) - 1)**0.5  # Simplified correlation
+    Nu_critical = np.where(Ra_range > 1708, 
+                          1 + 0.5 * np.sqrt((Ra_range/1708) - 1), 
+                          1.0)  # Pure conduction below critical Ra
     ax1.loglog(Ra_range, Nu_critical, 'b-', linewidth=2)
     ax1.axhline(y=1, color='r', linestyle='--', label='Pure conduction')
     ax1.axvline(x=1708, color='g', linestyle='--', label='Critical Ra')
