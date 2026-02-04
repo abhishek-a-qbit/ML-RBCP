@@ -7,7 +7,7 @@ import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-import seaborn as sns
+# import seaborn as sns  # Commented out for Streamlit Cloud compatibility
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import time
