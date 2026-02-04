@@ -17,11 +17,32 @@ import os
 # Add the current directory to Python path to import our solvers
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
+# Try to import solvers, but handle gracefully for Streamlit Cloud
 try:
     from solvers import SolverFactory, compute_nusselt_number, validate_solution
+    SOLVERS_AVAILABLE = True
 except ImportError as e:
-    st.error(f"Error importing solvers: {e}")
-    st.stop()
+    st.warning(f"Advanced solvers not available: {e}")
+    SOLVERS_AVAILABLE = False
+    
+    # Create dummy solver factory for Streamlit Cloud
+    class DummySolverFactory:
+        @staticmethod
+        def get_available_methods():
+            return {
+                'finite_difference': {
+                    'name': 'Finite Difference Method',
+                    'description': 'Traditional CFD approach using grid discretization',
+                    'pros': ['Robust', 'Widely applicable', 'Easy to implement'],
+                    'cons': ['Second-order accuracy', 'Numerical diffusion']
+                }
+            }
+        
+        @staticmethod
+        def create_solver(method, **kwargs):
+            return None
+    
+    SolverFactory = DummySolverFactory
 
 # Set page config
 st.set_page_config(
@@ -520,66 +541,134 @@ with main_tabs[1]:
     if solve_method1:
         st.subheader(f"🔬 {SolverFactory.get_available_methods()[method1]['name']}")
         
-        with st.spinner(f"Running {method1}..."):
-            try:
-                start_time = time.time()
-                solver = SolverFactory.create_solver(
-                    method=method1,
-                    nx=st.session_state.nx, ny=st.session_state.ny, 
-                    Ra=st.session_state.Ra, Pr=st.session_state.Pr, 
-                    aspect_ratio=st.session_state.aspect_ratio,
-                    max_iter=st.session_state.max_iterations, 
-                    tol=st.session_state.tolerance,
-                    epochs=st.session_state.training_epochs, 
-                    lr=st.session_state.learning_rate
-                )
-                results = solver.solve()
-                
-                st.session_state.results1 = results
-                st.session_state.time1 = time.time() - start_time
-                
-                st.success(f"✅ {method1} completed in {st.session_state.time1:.2f} seconds")
-                
-                # Show method details
-                with st.expander("📖 Method Details"):
-                    st.json(SolverFactory.get_available_methods()[method1])
-                
-                # Validation
-                validation = validate_solution(results)
-                with st.expander("✅ Solution Validation"):
-                    st.json(validation)
-                
-            except Exception as e:
-                st.error(f"❌ {method1} failed: {str(e)}")
-                st.exception(e)
+        if not SOLVERS_AVAILABLE:
+            st.warning("⚠️ Advanced solvers not available on Streamlit Cloud. Showing demo results.")
+            
+            # Generate demo results
+            x = np.linspace(0, 2, st.session_state.nx)
+            y = np.linspace(0, 1, st.session_state.ny)
+            X, Y = np.meshgrid(x, y)
+            
+            # Sample temperature field
+            T = 1 - Y + 0.1 * np.sin(2*np.pi*X/2) * np.sin(np.pi*Y)
+            
+            # Sample velocity field
+            psi = 0.1 * np.sin(np.pi * Y) * np.cos(2 * np.pi * X / 2)
+            u = np.gradient(psi, axis=0)
+            v = -np.gradient(psi, axis=1)
+            
+            results = {
+                'x': x, 'y': y,
+                'temperature': T,
+                'stream_function': psi,
+                'u_velocity': u,
+                'v_velocity': v,
+                'iterations': 100,
+                'final_error': 1e-6
+            }
+            
+            st.session_state.results1 = results
+            st.session_state.time1 = 2.0  # Demo time
+            
+            st.success(f"✅ {method1} demo completed in {st.session_state.time1:.2f} seconds")
+            
+            # Show method details
+            with st.expander("📖 Method Details"):
+                st.json(SolverFactory.get_available_methods()[method1])
+            
+        else:
+            with st.spinner(f"Running {method1}..."):
+                try:
+                    start_time = time.time()
+                    solver = SolverFactory.create_solver(
+                        method=method1,
+                        nx=st.session_state.nx, ny=st.session_state.ny, 
+                        Ra=st.session_state.Ra, Pr=st.session_state.Pr, 
+                        aspect_ratio=st.session_state.aspect_ratio,
+                        max_iter=st.session_state.max_iterations, 
+                        tol=st.session_state.tolerance,
+                        epochs=st.session_state.training_epochs, 
+                        lr=st.session_state.learning_rate
+                    )
+                    results = solver.solve()
+                    
+                    st.session_state.results1 = results
+                    st.session_state.time1 = time.time() - start_time
+                    
+                    st.success(f"✅ {method1} completed in {st.session_state.time1:.2f} seconds")
+                    
+                    # Show method details
+                    with st.expander("📖 Method Details"):
+                        st.json(SolverFactory.get_available_methods()[method1])
+                    
+                    # Validation
+                    validation = validate_solution(results)
+                    with st.expander("✅ Solution Validation"):
+                        st.json(validation)
+                    
+                except Exception as e:
+                    st.error(f"❌ {method1} failed: {str(e)}")
+                    st.exception(e)
     
     # Run Method 2
     if method2 != 'none' and solve_method2:
         st.subheader(f"🧠 {SolverFactory.get_available_methods()[method2]['name']}")
         
-        with st.spinner(f"Running {method2}..."):
-            try:
-                start_time = time.time()
-                solver = SolverFactory.create_solver(
-                    method=method2,
-                    nx=st.session_state.nx, ny=st.session_state.ny, 
-                    Ra=st.session_state.Ra, Pr=st.session_state.Pr, 
-                    aspect_ratio=st.session_state.aspect_ratio,
-                    max_iter=st.session_state.max_iterations, 
-                    tol=st.session_state.tolerance,
-                    epochs=st.session_state.training_epochs, 
-                    lr=st.session_state.learning_rate
-                )
-                results = solver.solve()
-                
-                st.session_state.results2 = results
-                st.session_state.time2 = time.time() - start_time
-                
-                st.success(f"✅ {method2} completed in {st.session_state.time2:.2f} seconds")
-                
-            except Exception as e:
-                st.error(f"❌ {method2} failed: {str(e)}")
-                st.exception(e)
+        if not SOLVERS_AVAILABLE:
+            st.warning("⚠️ Advanced solvers not available on Streamlit Cloud. Showing demo results.")
+            
+            # Generate demo results
+            x = np.linspace(0, 2, st.session_state.nx)
+            y = np.linspace(0, 1, st.session_state.ny)
+            X, Y = np.meshgrid(x, y)
+            
+            # Sample temperature field (slightly different for demo)
+            T = 1 - Y + 0.08 * np.sin(3*np.pi*X/2) * np.sin(np.pi*Y)
+            
+            # Sample velocity field
+            psi = 0.12 * np.sin(np.pi * Y) * np.cos(3 * np.pi * X / 2)
+            u = np.gradient(psi, axis=0)
+            v = -np.gradient(psi, axis=1)
+            
+            results = {
+                'x': x, 'y': y,
+                'temperature': T,
+                'stream_function': psi,
+                'u_velocity': u,
+                'v_velocity': v,
+                'iterations': 120,
+                'final_error': 8e-7
+            }
+            
+            st.session_state.results2 = results
+            st.session_state.time2 = 2.5  # Demo time
+            
+            st.success(f"✅ {method2} demo completed in {st.session_state.time2:.2f} seconds")
+            
+        else:
+            with st.spinner(f"Running {method2}..."):
+                try:
+                    start_time = time.time()
+                    solver = SolverFactory.create_solver(
+                        method=method2,
+                        nx=st.session_state.nx, ny=st.session_state.ny, 
+                        Ra=st.session_state.Ra, Pr=st.session_state.Pr, 
+                        aspect_ratio=st.session_state.aspect_ratio,
+                        max_iter=st.session_state.max_iterations, 
+                        tol=st.session_state.tolerance,
+                        epochs=st.session_state.training_epochs, 
+                        lr=st.session_state.learning_rate
+                    )
+                    results = solver.solve()
+                    
+                    st.session_state.results2 = results
+                    st.session_state.time2 = time.time() - start_time
+                    
+                    st.success(f"✅ {method2} completed in {st.session_state.time2:.2f} seconds")
+                    
+                except Exception as e:
+                    st.error(f"❌ {method2} failed: {str(e)}")
+                    st.exception(e)
 
 with main_tabs[2]:
     st.header("📊 Results Analysis & Comparison")
