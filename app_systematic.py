@@ -187,6 +187,48 @@ def create_solution_comparison(results1, results2, method1, method2):
     if results1 is None or results2 is None:
         return None
     
+    # Check grid compatibility and interpolate if necessary
+    x1, y1 = results1['x'], results1['y']
+    x2, y2 = results2['x'], results2['y']
+    
+    # If grids are different, interpolate to the finer grid
+    if len(x1) != len(x2) or len(y1) != len(y2):
+        # Use the finer grid for comparison
+        if len(x1) * len(y1) >= len(x2) * len(y2):
+            # Interpolate results2 to results1's grid
+            from scipy.interpolate import interp2d
+            X1, Y1 = np.meshgrid(x1, y1)
+            X2, Y2 = np.meshgrid(x2, y2)
+            
+            results2_interp = {}
+            for field in ['temperature', 'stream_function', 'u_velocity', 'v_velocity']:
+                if field in results2 and field in results1:
+                    f = interp2d(x2, y2, results2[field], kind='linear')
+                    results2_interp[field] = f(x1, y1)
+            
+            # Use interpolated results2 for comparison
+            temp_results2 = results2.copy()
+            for field, data in results2_interp.items():
+                temp_results2[field] = data
+            results2 = temp_results2
+        else:
+            # Interpolate results1 to results2's grid
+            from scipy.interpolate import interp2d
+            X1, Y1 = np.meshgrid(x1, y1)
+            X2, Y2 = np.meshgrid(x2, y2)
+            
+            results1_interp = {}
+            for field in ['temperature', 'stream_function', 'u_velocity', 'v_velocity']:
+                if field in results1 and field in results2:
+                    f = interp2d(x1, y1, results1[field], kind='linear')
+                    results1_interp[field] = f(x2, y2)
+            
+            # Use interpolated results1 for comparison
+            temp_results1 = results1.copy()
+            for field, data in results1_interp.items():
+                temp_results1[field] = data
+            results1 = temp_results1
+    
     fig = make_subplots(
         rows=3, cols=3,
         subplot_titles=[
@@ -217,6 +259,17 @@ def create_solution_comparison(results1, results2, method1, method2):
             if field == 'u_velocity':
                 data1 = np.sqrt(results1['u_velocity']**2 + results1['v_velocity']**2)
                 data2 = np.sqrt(results2['u_velocity']**2 + results2['v_velocity']**2)
+            
+            # Check for NaN or invalid data
+            if np.any(np.isnan(data1)) or np.any(np.isnan(data2)):
+                # Create placeholder plots for invalid data
+                for col in range(1, 4):
+                    fig.add_trace(
+                        go.Heatmap(z=np.zeros((10, 10)), x=[0, 1], y=[0, 1],
+                                  colorscale='Gray', showscale=False),
+                        row=i+1, col=col
+                    )
+                continue
             
             # Determine color scale
             vmin = min(np.min(data1), np.min(data2))
